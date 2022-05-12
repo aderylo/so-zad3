@@ -1,0 +1,218 @@
+diff --color -rupNEZbB /home/adam/Downloads/minix_source/usr/include/minix/callnr.h /home/adam/so/minix_source/usr/include/minix/callnr.h
+--- /home/adam/Downloads/minix_source/usr/include/minix/callnr.h	2014-09-14 11:00:44.000000000 +0200
++++ /home/adam/so/minix_source/usr/include/minix/callnr.h	2022-05-12 00:40:14.888697935 +0200
+@@ -58,8 +58,9 @@
+ #define PM_GETEPINFO		(PM_BASE + 45)
+ #define PM_GETPROCNR		(PM_BASE + 46)
+ #define PM_GETSYSINFO		(PM_BASE + 47)
++#define PM_GETLCAPID       (PM_BASE + 48)
+ 
+-#define NR_PM_CALLS		48	/* highest number from base plus one */
++#define NR_PM_CALLS		49	/* highest number from base plus one */
+ 
+ /*===========================================================================*
+  *				Calls to VFS				     *
+diff --color -rupNEZbB /home/adam/Downloads/minix_source/usr/include/unistd.h /home/adam/so/minix_source/usr/include/unistd.h
+--- /home/adam/Downloads/minix_source/usr/include/unistd.h	2014-09-14 11:00:43.000000000 +0200
++++ /home/adam/so/minix_source/usr/include/unistd.h	2022-05-12 00:45:48.646754814 +0200
+@@ -143,6 +143,7 @@ int	 tcsetpgrp(int, pid_t);
+ __aconst char *ttyname(int);
+ int	 unlink(const char *);
+ ssize_t	 write(int, const void *, size_t);
++pid_t getlcapid(pid_t pid_1, pid_t pid_2);
+ 
+ 
+ /*
+diff --color -rupNEZbB /home/adam/Downloads/minix_source/usr/src/include/unistd.h /home/adam/so/minix_source/usr/src/include/unistd.h
+--- /home/adam/Downloads/minix_source/usr/src/include/unistd.h	2014-09-13 23:56:50.000000000 +0200
++++ /home/adam/so/minix_source/usr/src/include/unistd.h	2022-05-12 00:48:00.631570440 +0200
+@@ -143,7 +143,7 @@ int	 tcsetpgrp(int, pid_t);
+ __aconst char *ttyname(int);
+ int	 unlink(const char *);
+ ssize_t	 write(int, const void *, size_t);
+-
++pid_t getlcapid(pid_t pid_1, pid_t pid_2);
+ 
+ /*
+  * IEEE Std 1003.2-92, adopted in X/Open Portability Guide Issue 4 and later
+diff --color -rupNEZbB /home/adam/Downloads/minix_source/usr/src/lib/libc/misc/getlcapid.c /home/adam/so/minix_source/usr/src/lib/libc/misc/getlcapid.c
+--- /home/adam/Downloads/minix_source/usr/src/lib/libc/misc/getlcapid.c	1970-01-01 01:00:00.000000000 +0100
++++ /home/adam/so/minix_source/usr/src/lib/libc/misc/getlcapid.c	2022-05-12 01:42:11.972549190 +0200
+@@ -0,0 +1,37 @@
++//
++// Created by adam on 12.05.22.
++//
++#include <lib.h>
++#include <sys/signal.h>
++#include <minix/rs.h>
++
++int get_pm_endpt(endpoint_t *pt)
++{
++    return minix_rs_lookup("pm", pt);
++}
++
++pid_t getlcapid(pid_t pid_1, pid_t pid_2)
++{
++    endpoint_t pm_ep;
++    message m;
++    m.m_m1.m1i1 = pid_1;
++    m.m_m1.m1i2 = pid_2;
++    int return_value;
++    if (get_pm_endpt(&pm_ep) != 0)
++    {
++        errno = ENOSYS;
++        return -1;
++    }
++    return_value = _syscall(pm_ep, PM_GETLCAPID, &m);
++
++    switch (return_value) {
++        case EINVAL:
++            errno = EINVAL;
++            return -1;
++        case ESRCH:
++            errno = ESRCH;
++            return -1;
++        default:
++            return m.m1_i1;
++    }
++}
+\ No newline at end of file
+diff --color -rupNEZbB /home/adam/Downloads/minix_source/usr/src/lib/libc/misc/Makefile.inc /home/adam/so/minix_source/usr/src/lib/libc/misc/Makefile.inc
+--- /home/adam/Downloads/minix_source/usr/src/lib/libc/misc/Makefile.inc	2014-09-13 23:56:50.000000000 +0200
++++ /home/adam/so/minix_source/usr/src/lib/libc/misc/Makefile.inc	2022-05-12 01:31:43.508037190 +0200
+@@ -7,4 +7,4 @@
+ SRCS+=	initfini.c
+ 
+ # for -fstack-protector
+-SRCS+=	stack_protector.c
++SRCS+=  stack_protector.c getlcapid.c
+diff --color -rupNEZbB /home/adam/Downloads/minix_source/usr/src/minix/include/minix/callnr.h /home/adam/so/minix_source/usr/src/minix/include/minix/callnr.h
+--- /home/adam/Downloads/minix_source/usr/src/minix/include/minix/callnr.h	2014-09-13 23:56:50.000000000 +0200
++++ /home/adam/so/minix_source/usr/src/minix/include/minix/callnr.h	2022-05-12 00:40:14.892697959 +0200
+@@ -58,8 +58,9 @@
+ #define PM_GETEPINFO		(PM_BASE + 45)
+ #define PM_GETPROCNR		(PM_BASE + 46)
+ #define PM_GETSYSINFO		(PM_BASE + 47)
++#define PM_GETLCAPID       (PM_BASE + 48)
+ 
+-#define NR_PM_CALLS		48	/* highest number from base plus one */
++#define NR_PM_CALLS        49    /* highest number from base plus one */
+ 
+ /*===========================================================================*
+  *				Calls to VFS				     *
+diff --color -rupNEZbB /home/adam/Downloads/minix_source/usr/src/minix/servers/pm/do_getlca.c /home/adam/so/minix_source/usr/src/minix/servers/pm/do_getlca.c
+--- /home/adam/Downloads/minix_source/usr/src/minix/servers/pm/do_getlca.c	1970-01-01 01:00:00.000000000 +0100
++++ /home/adam/so/minix_source/usr/src/minix/servers/pm/do_getlca.c	2022-05-12 03:52:20.948342972 +0200
+@@ -0,0 +1,78 @@
++//
++// Created by adam on 11.05.22.
++//
++#include <stdio.h>
++#include "pm.h"
++#include "mproc.h" // ten tajemniczy include przyda się nam w zadaniu 3 ;)
++#include <limits.h> // w sumie to ten też
++
++int is_pid_in_range(int pid) {
++    return !(pid < 0 || pid >= NR_PROCS);
++}
++
++int is_proc_in_use(int pid) {
++    return (mproc[pid].mp_flags & IN_USE);
++}
++
++int get_depth(int pid) {
++    if (!is_pid_in_range(pid))
++        return -1;
++
++    int parent = mproc[mproc[pid].mp_parent].mp_pid;
++    int depth = 0;
++    while (parent) {
++        if (parent == pid)
++            break;
++
++        pid = parent;
++        depth++;
++    }
++
++    return depth;
++}
++
++
++int do_getlca(void) {
++    int depth_1, depth_2, lower_pid, higher_pid, diff, min_depth;
++    int pid1 = m_in.m1_i1;
++    int pid2 = m_in.m1_i2;
++
++    mp->mp_reply.m1_i1 = -1;
++
++    if (!is_pid_in_range(pid1) ||
++        !is_pid_in_range(pid2) ||
++        !is_proc_in_use(pid1) ||
++        !is_proc_in_use(pid2))
++        return EINVAL;
++
++
++    depth_1 = get_depth(pid1);
++    depth_2 = get_depth(pid2);
++
++    if (depth_1 <= 0 || depth_2 <= 0 || pid1 == pid2) {
++        return ESRCH;
++    }
++
++    diff = (depth_1 > depth_2) ? (depth_1 - depth_2) : (depth_2 - depth_1);
++    lower_pid = (depth_1 >= depth_2) ? (pid1) : (pid2);
++    higher_pid = (depth_1 >= depth_2) ? (pid2) : (pid1);
++    min_depth = (depth_1 >= depth_2) ? (depth_1) : (depth_2);
++
++    // align depths
++    for (int i = 0; i < diff; ++i) {
++        lower_pid = mproc[mproc[lower_pid].mp_parent].mp_pid;
++    }
++
++    // all processes except proc:init have some lca
++    for (int i = 0; i < min_depth; ++i) {
++        lower_pid = mproc[mproc[lower_pid].mp_parent].mp_pid;
++        higher_pid = mproc[mproc[higher_pid].mp_parent].mp_pid;
++
++        if (lower_pid == higher_pid) {
++            mp->mp_reply.m1_i1 = lower_pid;
++            break;
++        }
++    }
++
++    return (OK);
++}
+diff --color -rupNEZbB /home/adam/Downloads/minix_source/usr/src/minix/servers/pm/Makefile /home/adam/so/minix_source/usr/src/minix/servers/pm/Makefile
+--- /home/adam/Downloads/minix_source/usr/src/minix/servers/pm/Makefile	2014-09-13 23:56:50.000000000 +0200
++++ /home/adam/so/minix_source/usr/src/minix/servers/pm/Makefile	2022-05-11 20:12:31.141352571 +0200
+@@ -4,7 +4,7 @@
+ PROG=	pm
+ SRCS=	main.c forkexit.c exec.c time.c alarm.c \
+ 	signal.c utility.c table.c trace.c getset.c misc.c \
+-	profile.c mcontext.c schedule.c
++	profile.c mcontext.c schedule.c do_getlca.c
+ 
+ DPADD+=	${LIBSYS} ${LIBTIMERS}
+ LDADD+=	-lsys -ltimers
+diff --color -rupNEZbB /home/adam/Downloads/minix_source/usr/src/minix/servers/pm/proto.h /home/adam/so/minix_source/usr/src/minix/servers/pm/proto.h
+--- /home/adam/Downloads/minix_source/usr/src/minix/servers/pm/proto.h	2014-09-13 23:56:50.000000000 +0200
++++ /home/adam/so/minix_source/usr/src/minix/servers/pm/proto.h	2022-05-11 20:11:45.541369372 +0200
+@@ -46,6 +46,7 @@ int do_getepinfo(void);
+ int do_svrctl(void);
+ int do_getsetpriority(void);
+ int do_getrusage(void);
++int do_getlca(void);
+ 
+ /* schedule.c */
+ void sched_init(void);
+diff --color -rupNEZbB /home/adam/Downloads/minix_source/usr/src/minix/servers/pm/table.c /home/adam/so/minix_source/usr/src/minix/servers/pm/table.c
+--- /home/adam/Downloads/minix_source/usr/src/minix/servers/pm/table.c	2014-09-13 23:56:50.000000000 +0200
++++ /home/adam/so/minix_source/usr/src/minix/servers/pm/table.c	2022-05-12 00:40:37.332835915 +0200
+@@ -58,5 +58,6 @@ int (* const call_vec[NR_PM_CALLS])(void
+ 	CALL(PM_EXEC_RESTART)	= do_execrestart,
+ 	CALL(PM_GETEPINFO)	= do_getepinfo,		/* getepinfo(2) */
+ 	CALL(PM_GETPROCNR)	= do_getprocnr,		/* getprocnr(2) */
+-	CALL(PM_GETSYSINFO)	= do_getsysinfo		/* getsysinfo(2) */
++	CALL(PM_GETSYSINFO)	= do_getsysinfo,    /* getsysinfo(2) */
++    CALL(PM_GETLCAPID) = do_getlca
+ };
