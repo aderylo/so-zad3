@@ -1,3 +1,12 @@
+## Patch 
+
+patch znajduje się w pliku ad432952.patch
+
+
+
+
+## Usage 
+
 Skrypt sync.sh kopiuje zmienione pliki na MINIX-a.
 
 Na MINIX-ie należy zainstalować rsync:
